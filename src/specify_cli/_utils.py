@@ -322,6 +322,16 @@ def version_satisfies(current: str, required: str) -> bool:
     from packaging import version as pkg_version
     from packaging.specifiers import InvalidSpecifier, SpecifierSet
 
+    # Guard non-string inputs up front: this helper is documented to return a
+    # bool, but ``Version``/``SpecifierSet`` don't reliably raise a catchable
+    # parse error on the wrong type. A float/list (e.g. from a YAML authoring
+    # slip such as ``speckit_version: 1.0``) either raises a raw ``TypeError``
+    # ("object is not iterable") or — for a list of strings — constructs a
+    # broken ``SpecifierSet`` that only fails later with ``AttributeError`` in
+    # ``.contains``. Treat any non-string as "not satisfied".
+    if not isinstance(current, str) or not isinstance(required, str):
+        return False
+
     try:
         current_ver = pkg_version.Version(current)
         specifier = SpecifierSet(required)

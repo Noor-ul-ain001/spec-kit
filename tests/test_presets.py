@@ -251,6 +251,24 @@ class TestPresetManifest:
         with pytest.raises(PresetValidationError, match="Missing requires.speckit_version"):
             PresetManifest(manifest_path)
 
+    def test_non_string_speckit_version_rejected(self, temp_dir, valid_pack_data):
+        """A non-string ``requires.speckit_version`` must be rejected at
+        validation time. A YAML slip like ``speckit_version: 1.0`` parses as a
+        float (and ``[">=1.0"]`` as a list); both previously passed the
+        presence-only check and then crashed ``check_compatibility`` with a raw
+        ``TypeError`` from ``SpecifierSet(<non-str>)``.
+        """
+        for bad in (1.0, [">=0.1.0"], True):
+            valid_pack_data["requires"]["speckit_version"] = bad
+            manifest_path = temp_dir / "preset.yml"
+            with open(manifest_path, 'w') as f:
+                yaml.dump(valid_pack_data, f)
+            with pytest.raises(
+                PresetValidationError,
+                match="requires.speckit_version: must be a string",
+            ):
+                PresetManifest(manifest_path)
+
     def test_no_templates_provided(self, temp_dir, valid_pack_data):
         """Test pack with no templates."""
         valid_pack_data["provides"]["templates"] = []

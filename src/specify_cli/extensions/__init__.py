@@ -248,6 +248,17 @@ class ExtensionManifest:
         requires = self.data["requires"]
         if "speckit_version" not in requires:
             raise ValidationError("Missing requires.speckit_version")
+        # Require a string: a YAML authoring slip like ``speckit_version: 1.0``
+        # (parsed as a float) or ``speckit_version: [">=1.0"]`` (a list) would
+        # otherwise pass this presence check and then crash ``check_compatibility``
+        # with a raw ``TypeError`` from ``SpecifierSet(<non-str>)`` ("'float'
+        # object is not iterable") instead of a clean CompatibilityError. Mirror
+        # the ``extension.version`` type validation above and fail fast here.
+        if not isinstance(requires["speckit_version"], str):
+            raise ValidationError(
+                "Invalid requires.speckit_version: must be a string "
+                f"(e.g. '>=0.1.0'), got {type(requires['speckit_version']).__name__}"
+            )
 
         # Validate provides section
         provides = self.data["provides"]

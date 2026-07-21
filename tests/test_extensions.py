@@ -375,6 +375,25 @@ class TestExtensionManifest:
         with pytest.raises(ValidationError, match="Invalid version"):
             ExtensionManifest(manifest_path)
 
+    def test_non_string_speckit_version_rejected(self, temp_dir, valid_manifest_data):
+        """A non-string ``requires.speckit_version`` must be rejected at
+        validation time. A YAML slip like ``speckit_version: 1.0`` parses as a
+        float (and ``[">=1.0"]`` as a list); both previously passed the
+        presence-only check and then crashed ``check_compatibility`` with a raw
+        ``TypeError`` from ``SpecifierSet(<non-str>)``.
+        """
+        import yaml
+
+        for bad in (1.0, [">=0.1.0"], True):
+            valid_manifest_data["requires"]["speckit_version"] = bad
+            manifest_path = temp_dir / "extension.yml"
+            with open(manifest_path, 'w') as f:
+                yaml.dump(valid_manifest_data, f)
+            with pytest.raises(
+                ValidationError, match="requires.speckit_version: must be a string"
+            ):
+                ExtensionManifest(manifest_path)
+
     def test_valid_category(self, temp_dir, valid_manifest_data):
         """Test manifest with various category values (free-form string)."""
         import yaml
@@ -2957,6 +2976,19 @@ class TestVersionSatisfies:
         """Test invalid version strings."""
         assert not version_satisfies("invalid", ">=1.0.0")
         assert not version_satisfies("1.0.0", "invalid specifier")
+
+    def test_version_satisfies_non_string_returns_false(self):
+        """A non-string argument must yield ``False``, not a raw ``TypeError``.
+
+        ``SpecifierSet``/``Version`` iterate their argument, so a float/list
+        (e.g. from a YAML authoring slip) raises "object is not iterable"
+        instead of InvalidSpecifier. The helper is documented to return a bool,
+        so an unusable version or specifier counts as "not satisfied".
+        """
+        assert not version_satisfies(1.0, ">=1.0.0")
+        assert not version_satisfies("1.0.0", 1.0)
+        assert not version_satisfies("1.0.0", [">=1.0.0"])
+        assert not version_satisfies(None, ">=1.0.0")
 
 
 # ===== Integration Tests =====
